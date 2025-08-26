@@ -1,1 +1,57 @@
-<!doctype html><html><body><h1>Hello Kakao</h1></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>Kakao Friends Message</title>
+  <script src="https://developers.kakao.com/sdk/js/kakao.min.js"></script>
+</head>
+<body>
+  <h1>카톡 친구에게 "안녕" 보내기</h1>
+  <button id="login">카카오 로그인</button>
+  <button id="friends">친구목록</button>
+  <button id="send">"안녕" 보내기</button>
+  <pre id="log"></pre>
+
+  <script>
+    Kakao.init('👉여기에 자바스크립트 키');
+    console.log(Kakao.isInitialized());
+
+    const log = m => document.getElementById('log').textContent += m + "\n";
+    let selectedUuid = null;
+
+    document.getElementById('login').onclick = () => {
+      Kakao.Auth.login({
+        scope: 'friends talk_message',
+        success: res => log('로그인 OK ' + JSON.stringify(res)),
+        fail: err => log('로그인 실패 ' + JSON.stringify(err))
+      });
+    };
+
+    document.getElementById('friends').onclick = () => {
+      Kakao.API.request({ url: '/v1/api/talk/friends' })
+        .then(r => {
+          log('친구목록 ' + JSON.stringify(r));
+          selectedUuid = r.elements?.[0]?.uuid || null;
+        })
+        .catch(e => log('실패 ' + JSON.stringify(e)));
+    };
+
+    document.getElementById('send').onclick = () => {
+      if (!selectedUuid) return alert("친구 먼저 선택");
+      Kakao.API.request({
+        url: '/v1/api/talk/friends/message/default/send',
+        data: {
+          receiver_uuids: [selectedUuid],
+          template_object: {
+            object_type: 'text',
+            text: '안녕',
+            link: { web_url: location.href }
+          }
+        }
+      })
+      .then(r => log('전송 OK ' + JSON.stringify(r)))
+      .catch(e => log('전송 실패 ' + JSON.stringify(e)));
+    };
+  </script>
+</body>
+</html>
