@@ -1,4 +1,4 @@
-<!doctype html>
+<!-- <!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8">
@@ -54,6 +54,271 @@
       .then(r => log('전송 OK ' + JSON.stringify(r)))
       .catch(e => log('전송 실패 ' + JSON.stringify(e)));
     };
+  </script>
+</body>
+</html>
+ -->
+ <!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Kakao Friends Message</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://developers.kakao.com/sdk/js/kakao.min.js"></script>
+  <style>
+    :root { --bg:#0b0c10; --card:#121419; --ink:#e8e8ea; --muted:#9aa0a6; --brand:#fdd835; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 24px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Apple SD Gothic Neo, "Noto Sans KR", sans-serif;
+      background: var(--bg); color: var(--ink);
+    }
+    h1 { font-size: 20px; margin: 0 0 16px; }
+    .wrap { display: grid; gap: 16px; max-width: 900px; margin: 0 auto; }
+    .row { display: grid; gap: 12px; grid-template-columns: 1fr; }
+    @media (min-width: 860px) { .row { grid-template-columns: 1.2fr 1fr; } }
+
+    .card {
+      background: linear-gradient(180deg, #141823, #0f1320 60%);
+      border: 1px solid #23283a; border-radius: 14px; padding: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    }
+    .title { font-weight: 700; font-size: 14px; letter-spacing: .2px; margin-bottom: 10px; color: #f1f3f5; }
+    .muted { color: var(--muted); font-size: 12px; }
+
+    button, input, select, textarea {
+      font: inherit; color: var(--ink); background: #1a1f2e; border: 1px solid #2c334a; border-radius: 10px;
+    }
+    button {
+      padding: 10px 14px; cursor: pointer; font-weight: 700;
+      background: linear-gradient(180deg, #1f2740, #171d31); border: 1px solid #2b3552;
+    }
+    button.primary {
+      background: linear-gradient(180deg, #ffd54f, #fbc02d);
+      color: #1b1b1b; border: none;
+    }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    input, textarea, select { width: 100%; padding: 10px 12px; }
+    .row-cols { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .friend {
+      display: grid; gap: 8px; align-content: start; padding: 12px; border-radius: 12px; border: 1px solid #26314a; background:#121827; cursor: pointer;
+      transition: transform .05s ease, border-color .15s ease;
+    }
+    .friend:hover { transform: translateY(-1px); border-color: #3a4d75; }
+    .friend.selected { outline: 2px solid #6ea8fe; border-color: #6ea8fe; }
+    .friend .nick { font-weight: 700; }
+    .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .log { white-space: pre-wrap; background:#0c1020; border-radius: 10px; padding: 10px; border:1px solid #1f2a48; max-height: 220px; overflow:auto; }
+    .row-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .inline { display: inline-flex; gap: 8px; align-items: center; }
+    .small { font-size: 12px; }
+    .pill { padding: 4px 8px; background:#101728; border:1px solid #2c3550; border-radius:999px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>카톡 친구에게 메시지 보내기</h1>
+
+    <div class="row">
+      <!-- 좌측: 로그인 / 친구목록 -->
+      <div class="card">
+        <div class="title">① 로그인 & 친구 가져오기</div>
+        <div class="btns">
+          <button id="loginBtn">카카오 로그인</button>
+          <button id="logoutBtn">로그아웃</button>
+          <span id="loginState" class="pill muted">로그인 안 됨</span>
+        </div>
+        <div style="height:10px"></div>
+        <div class="btns">
+          <button id="fetchFriendsBtn">친구목록 불러오기</button>
+          <span class="muted small">(* <b>friends, talk_message</b> 권한 필요, 테스터만 조회 가능)</span>
+        </div>
+        <div style="height:12px"></div>
+        <div id="friendsEmpty" class="muted small" style="display:none;">표시할 친구가 없어요. (상대방이 앱에 로그인/권한 동의했는지 확인)</div>
+        <div id="friendsGrid" class="row-cols"></div>
+      </div>
+
+      <!-- 우측: 메시지 작성 / 전송 -->
+      <div class="card">
+        <div class="title">② 메시지 작성 & 전송</div>
+        <label class="muted small">보낼 대상</label>
+        <input id="selectedFriendLabel" type="text" placeholder="아직 선택된 친구가 없습니다." readonly />
+
+        <div style="height:12px"></div>
+        <label class="muted small">메시지 내용</label>
+        <textarea id="messageInput" rows="4" placeholder="기본값: 안녕">안녕</textarea>
+
+        <div style="height:12px"></div>
+        <div class="row-actions">
+          <div class="inline">
+            <input id="includeLink" type="checkbox" checked />
+            <label for="includeLink" class="small">링크 포함</label>
+          </div>
+          <input id="linkInput" type="url" placeholder="링크 URL (비워두면 현재 페이지 주소)" />
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="btns">
+          <button id="sendBtn" class="primary" disabled>메시지 보내기</button>
+          <button id="clearBtn">입력 초기화</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 하단: 로그 -->
+    <div class="card">
+      <div class="title">로그</div>
+      <div id="log" class="log"></div>
+    </div>
+  </div>
+
+  <script>
+    // 1) SDK 초기화
+    // Kakao.init('👉 여기에 자바스크립트 키');
+    Kakao.init('fd68caed7a478deaea50b7a827bf5c3c');
+    console.log('Kakao SDK initialized:', Kakao.isInitialized());
+
+    // 2) DOM 헬퍼
+    const $ = (id) => document.getElementById(id);
+    const log = (m, obj) => {
+      const t = new Date().toLocaleTimeString();
+      $('log').textContent += `[${t}] ${m}${obj ? ' ' + JSON.stringify(obj) : ''}\n`;
+      $('log').scrollTop = $('log').scrollHeight;
+    };
+
+    // 3) 상태
+    let selectedFriend = null;   // { uuid, profile_nickname, profile_thumbnail_image }
+    let friends = [];            // 전체 목록
+
+    // 4) UI 업데이트
+    function setLoginStateUI() {
+      const auth = Kakao.Auth.getAccessToken();
+      $('loginState').textContent = auth ? '로그인됨' : '로그인 안 됨';
+    }
+
+    function renderFriends(list) {
+      const grid = $('friendsGrid');
+      grid.innerHTML = '';
+      if (!list || list.length === 0) {
+        $('friendsEmpty').style.display = 'block';
+        $('sendBtn').disabled = true;
+        setSelectedFriend(null);
+        return;
+      }
+      $('friendsEmpty').style.display = 'none';
+
+      list.forEach((f, idx) => {
+        const card = document.createElement('div');
+        card.className = 'friend';
+        card.dataset.uuid = f.uuid;
+
+        const avatar = document.createElement('div');
+        avatar.style.width = '100%';
+        avatar.style.aspectRatio = '4/3';
+        avatar.style.borderRadius = '10px';
+        avatar.style.background = `center/cover no-repeat url(${f.profile_thumbnail_image || ''})`;
+        avatar.style.border = '1px solid #2a3552';
+
+        const nick = document.createElement('div');
+        nick.className = 'nick';
+        nick.textContent = f.profile_nickname || '(이름 없음)';
+
+        const sub = document.createElement('div');
+        sub.className = 'muted small';
+        sub.textContent = f.uuid;
+
+        card.appendChild(avatar);
+        card.appendChild(nick);
+        card.appendChild(sub);
+
+        card.addEventListener('click', () => {
+          setSelectedFriend(f);
+          // 선택 강조 처리
+          [...grid.children].forEach(el => el.classList.remove('selected'));
+          card.classList.add('selected');
+        });
+
+        grid.appendChild(card);
+      });
+    }
+
+    function setSelectedFriend(f) {
+      selectedFriend = f;
+      if (f) {
+        $('selectedFriendLabel').value = `${f.profile_nickname || '(이름 없음)'} (${f.uuid})`;
+        $('sendBtn').disabled = false;
+      } else {
+        $('selectedFriendLabel').value = '';
+        $('sendBtn').disabled = true;
+      }
+    }
+
+    // 5) 이벤트 바인딩
+    $('loginBtn').onclick = () => {
+      Kakao.Auth.login({
+        scope: 'friends talk_message',
+        success: (res) => { log('로그인 성공', res); setLoginStateUI(); },
+        fail: (err) => { log('로그인 실패', err); }
+      });
+    };
+
+    $('logoutBtn').onclick = () => {
+      Kakao.Auth.logout(() => {
+        log('로그아웃 완료');
+        setLoginStateUI();
+        renderFriends([]); // 초기화
+      });
+    };
+
+    $('fetchFriendsBtn').onclick = async () => {
+      try {
+        const r = await Kakao.API.request({ url: '/v1/api/talk/friends' });
+        // r = { elements: [...], total_count, favorite_count, after_url }
+        friends = (r && r.elements) ? r.elements : [];
+        log('친구목록', { total: friends.length });
+        renderFriends(friends);
+      } catch (e) {
+        log('친구목록 실패', e);
+      }
+    };
+
+    $('clearBtn').onclick = () => {
+      $('messageInput').value = '안녕';
+      $('includeLink').checked = true;
+      $('linkInput').value = '';
+      log('입력 초기화');
+    };
+
+    $('sendBtn').onclick = async () => {
+      if (!selectedFriend) return alert('친구를 먼저 선택하세요.');
+      const text = $('messageInput').value?.trim() || '안녕';
+      const includeLink = $('includeLink').checked;
+      const linkUrl = $('linkInput').value?.trim() || location.href;
+
+      // Kakao "기본 텍스트 템플릿"은 link 필드가 필요합니다.
+      const template_object = {
+        object_type: 'text',
+        text,
+        link: includeLink ? { web_url: linkUrl, mobile_web_url: linkUrl } : { web_url: location.href, mobile_web_url: location.href },
+        button_title: '열어보기'
+      };
+
+      try {
+        const r = await Kakao.API.request({
+          url: '/v1/api/talk/friends/message/default/send',
+          data: {
+            receiver_uuids: [selectedFriend.uuid],
+            template_object
+          }
+        });
+        log('전송 성공', r);
+      } catch (e) {
+        log('전송 실패', e);
+        // 권한/테스터/도메인/HTTPS 미적용 등 다양한 이유가 있을 수 있음
+      }
+    };
+
+    // 초기 상태 반영
+    setLoginStateUI();
   </script>
 </body>
 </html>
