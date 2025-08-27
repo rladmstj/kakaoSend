@@ -298,6 +298,63 @@
     };
 
     setLoginStateUI();
+    <script>
+// === 도우미들 ===
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const chunk = (arr, n) => Array.from({length: Math.ceil(arr.length/n)}, (_,i)=>arr.slice(i*n,(i+1)*n));
+const MAX_PER_REQ = 5; // 카카오: 한 요청당 최대 5명
+
+function ensureLoginOrFail(){
+  const token = Kakao.Auth.getAccessToken();
+  if(!token) { alert('카카오 로그인이 필요합니다.'); throw new Error('not_logged_in'); }
+}
+
+async function sendToUuids(uuids, text, link){
+  ensureLoginOrFail();
+  const template_object = {
+    object_type: 'text',
+    text: (text || '이전 설문에 참여하지 않았습니다. 다음 알림에 참여해주세요.').slice(0, 900),
+    link: link ? { web_url: link, mobile_web_url: link } : undefined,
+    button_title: '열어보기'
+  };
+
+  const batches = chunk(uuids.filter(Boolean), MAX_PER_REQ);
+  const results = [];
+  for(const group of batches){
+    try{
+      const r = await Kakao.API.request({
+        url: '/v1/api/talk/friends/message/default/send',
+        data: { receiver_uuids: group, template_object }
+      });
+      results.push({ ok:true, group, r });
+      await sleep(400); // 너무 빠른 연속 호출 방지
+    }catch(e){
+      results.push({ ok:false, group, error: e });
+      await sleep(400);
+    }
+  }
+  return results;
+}
+
+// === 다른 사이트에서 오는 postMessage 수신 (오리진 검사 없음) ===
+window.addEventListener('message', async (event) => {
+  const { type, payload } = event.data || {};
+  if(type !== 'KAKAO_BULK_SEND') return;
+
+  try{
+    const uuids = Array.isArray(payload?.uuids) ? payload.uuids : [];
+    if(uuids.length === 0) throw new Error('uuids 가 비어 있습니다.');
+    const text = payload?.text;
+    const link = payload?.link;
+
+    const results = await sendToUuids(uuids, text, link);
+    event.source?.postMessage({ type: 'KAKAO_BULK_SEND_DONE', results }, event.origin);
+  }catch(err){
+    event.source?.postMessage({ type: 'KAKAO_BULK_SEND_DONE', error: String(err) }, event.origin);
+  }
+});
+</script>
+
   </script>
 </body>
 </html>
