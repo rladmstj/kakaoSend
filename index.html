@@ -298,7 +298,7 @@
     };
 
     setLoginStateUI();
-    <script>
+   
 // === 도우미들 ===
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const chunk = (arr, n) => Array.from({length: Math.ceil(arr.length/n)}, (_,i)=>arr.slice(i*n,(i+1)*n));
@@ -353,7 +353,7 @@ window.addEventListener('message', async (event) => {
     event.source?.postMessage({ type: 'KAKAO_BULK_SEND_DONE', error: String(err) }, event.origin);
   }
 });
-</script>
+ 
 
   </script>
 </body>
