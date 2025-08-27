@@ -353,7 +353,12 @@ window.addEventListener('message', async (event) => {
     event.source?.postMessage({ type: 'KAKAO_BULK_SEND_DONE', error: String(err) }, event.origin);
   }
 });
- 
+   window.addEventListener('load', () => {
+    try {
+      // 로드/로그인 완료 후 부모에게 준비 완료 통지
+      window.parent && window.parent.postMessage({ type: 'KAKAO_SEND_READY' }, '*');
+    } catch(e) {}
+  });
 
   </script>
 </body>
